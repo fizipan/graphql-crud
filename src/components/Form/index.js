@@ -1,17 +1,52 @@
 import React from 'react';
 
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { NEW_BOOK } from '../../gql/books';
+import { NEW_BOOK, GET_BOOK, UPDATE_BOOK } from '../../gql/books';
 
-import { useMutation } from '@apollo/client';
+import { useMutation, useLazyQuery } from '@apollo/client';
 
 export default function Form(props) {
   // Navigate router
   const navigate = useNavigate();
 
-  // Use mutation
-  const [addBook, { loading, error }] = useMutation(NEW_BOOK);
+  // Get params
+  const params = useParams();
+
+  // Use mutation create
+  const [addBook, { loading: loadingAddBook, error: errorAddBook }] =
+    useMutation(NEW_BOOK);
+
+  // use LazyQuery get book
+  const [getBook, { data: dataBook, loading: loadingBook, error: errorBook }] =
+    useLazyQuery(GET_BOOK, {
+      variables: { _id: params.id },
+    });
+
+  // update book
+  const [updateBook, { loading: loadingUpdateBook, error: errorUpdateBook }] =
+    useMutation(UPDATE_BOOK);
+
+  // check if params is available and get book
+  React.useEffect(() => {
+    if (params.id) {
+      getBook();
+    }
+  }, [params.id, getBook]);
+
+  // enter getbook to input
+  React.useEffect(() => {
+    if (dataBook) {
+      const form = document.getElementById('form-book');
+      for (let i = 0; i < form.length; i++) {
+        const data = form[i];
+
+        if (data.nodeName === 'INPUT') {
+          data.value = dataBook.getBook[data.name];
+        }
+      }
+    }
+  }, [dataBook]);
 
   // Handle Submit
   async function handleOnSubmit(e) {
@@ -28,21 +63,44 @@ export default function Form(props) {
       }
     }
 
-    try {
-      const res = await addBook({
-        variables: {
-          ...formData,
-          release_year: parseInt(formData.release_year),
-        },
-      });
+    if (params.id) {
+      try {
+        const res = await updateBook({
+          variables: {
+            ...formData,
+            _id: params.id,
+            release_year: parseInt(formData.release_year),
+          },
+        });
 
-      if (res) {
-        navigate('/books');
+        if (res) {
+          navigate('/books');
+        }
+      } catch (error) {
+        console.log(error);
       }
-    } catch (error) {
-      console.log(error);
+    } else {
+      try {
+        const res = await addBook({
+          variables: {
+            ...formData,
+            release_year: parseInt(formData.release_year),
+          },
+        });
+
+        if (res) {
+          navigate('/books');
+        }
+      } catch (error) {
+        console.log(error);
+      }
     }
   }
+
+  // Check error
+  if (params.id && loadingBook) return 'loading....';
+
+  if (errorAddBook || errorBook) return 'Network error';
 
   return (
     <div>
